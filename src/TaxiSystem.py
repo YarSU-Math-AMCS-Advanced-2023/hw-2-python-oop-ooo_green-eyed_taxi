@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import List, Optional, Dict
 
 
@@ -83,7 +82,7 @@ class DriverInterface:
         self.driver_id = driver_id
 
     def accept_order(self, order_id: int) -> bool:
-        return self.taxi_park.assign_driver_to_order(order_id, self.driver_id)
+        return self.taxi_park.assign_driver_to_order(order_id)
 
     def complete_order(self, order_id: int):
         self.taxi_park.complete_order(order_id)
@@ -109,6 +108,9 @@ class TaxiPark(OrderSubject):
     def notify_drivers(self, order: Order):
         self.notify(order)
 
+    def get_available_drivers(self) -> List[Driver]:
+        return [driver for driver in self.drivers if driver.is_available]
+
     def add_driver(self, driver: Driver):
         self.drivers.append(driver)
         self.attach(driver)
@@ -116,18 +118,23 @@ class TaxiPark(OrderSubject):
     def add_car(self, car: Car):
         self.cars.append(car)
 
-    def assign_driver_to_order(self, order_id: int, driver_id: int) -> bool:
-        order = self.orders.get(order_id)
-        driver = next((d for d in self.drivers if d.driver_id == driver_id), None)
+    def assign_driver_to_order(self, order_id: int) -> bool:
+        available_drivers = self.get_available_drivers()
+        if len(available_drivers) > 0:
+            driver_id = available_drivers[0].driver_id
+            order = self.orders.get(order_id)
+            driver = next((d for d in self.drivers if d.driver_id == driver_id), None)
 
-        if order and driver and driver.is_available and order.status == "pending":
-            order.status = "in_progress"
-            order.driver = driver
-            driver.current_order = order
-            driver.is_available = False
-            order.price = 10.0
-            return True
-        return False
+            if order and driver and driver.is_available and order.status == "pending":
+                order.status = "in_progress"
+                order.driver = driver
+                driver.current_order = order
+                driver.is_available = False
+                order.price = 10.0
+                return driver_id
+            return -1
+        else:
+            return -1
 
     def complete_order(self, order_id: int):
         order = self.orders.get(order_id)
