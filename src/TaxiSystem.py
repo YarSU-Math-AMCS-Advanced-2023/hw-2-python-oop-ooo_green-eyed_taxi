@@ -1,4 +1,35 @@
 from typing import List, Optional, Dict
+import datetime
+
+
+class DriverAssignmentStrategy:
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DriverAssignmentStrategy, cls).__new__(cls)
+        return cls._instance
+    
+    def is_peak_hour(self) -> bool:
+        current_time = datetime.datetime.now().time()
+        morning_peak = datetime.time(7, 0) <= current_time <= datetime.time(10, 0)
+        evening_peak = datetime.time(17, 0) <= current_time <= datetime.time(20, 0)
+        return morning_peak or evening_peak
+    
+    def select_driver(self, drivers: List["Driver"], order: "Order") -> Optional["Driver"]:
+        if not drivers:
+            return None
+            
+        if self.is_peak_hour():
+            return min(drivers, key=lambda d: self.calculate_distance(d.current_location, order.pickup))
+        else:
+            return min(drivers, key=lambda d: abs(d.rating - order.client_rating))
+    
+    @staticmethod
+    def calculate_distance(location1: str, location2: str) -> float:
+        # Заглушка для реальной логики расчета расстояния
+        return hash(location1 + location2) % 100  # Примерное "расстояние"
+
 
 
 class OrderSubject:
@@ -19,11 +50,15 @@ class OrderSubject:
 
 
 class Driver:
-    def __init__(self, driver_id: int, name: str):
+    def __init__(self, driver_id: int, name: str, current_location: str = "default", rating: float = 5.0): #x: float, y: float, rating: float = 5.0):
         self.driver_id = driver_id
         self.name = name
         self.is_available = True
         self.current_order: Optional["Order"] = None
+        self.current_location = current_location
+        # self.x = x
+        # self.y = y
+        self.rating = rating
 
     def update(self, order: "Order"):
         if self.is_available:
@@ -39,7 +74,7 @@ class Car:
 
 
 class Order:
-    def __init__(self, order_id: int, client_id: int, pickup: str, destination: str):
+    def __init__(self, order_id: int, client_id: int, pickup: str, destination: str, client_rating: float = 5.0):
         self.order_id = order_id
         self.client_id = client_id
         self.pickup = pickup
@@ -47,6 +82,7 @@ class Order:
         self.status = "pending"  # pending, in_progress, completed
         self.driver: Optional[Driver] = None
         self.price: float = 0.0
+        self.client_rating = client_rating
 
 
 class ClientInterface:
@@ -119,22 +155,28 @@ class TaxiPark(OrderSubject):
         self.cars.append(car)
 
     def assign_driver_to_order(self, order_id: int) -> bool:
-        available_drivers = self.get_available_drivers()
-        if len(available_drivers) > 0:
-            driver_id = available_drivers[0].driver_id
-            order = self.orders.get(order_id)
-            driver = next((d for d in self.drivers if d.driver_id == driver_id), None)
+        order = self.orders.get(order_id)
+        if not order or order.status != "pending":
+            return -1
 
-            if order and driver and driver.is_available and order.status == "pending":
-                order.status = "in_progress"
-                order.driver = driver
-                driver.current_order = order
-                driver.is_available = False
-                order.price = 10.0
-                return driver_id
+        available_drivers = self.get_available_drivers()
+        if not available_drivers:
             return -1
-        else:
+
+        strategy = DriverAssignmentStrategy()
+        selected_driver = strategy.select_driver(available_drivers, order)
+        
+        if not selected_driver:
             return -1
+
+        order.status = "in_progress"
+        order.driver = selected_driver
+        selected_driver.current_order = order
+        selected_driver.is_available = False
+        order.price = 10.0
+
+        return selected_driver.driver_id
+
 
     def complete_order(self, order_id: int):
         order = self.orders.get(order_id)
