@@ -22,6 +22,9 @@ class TestTaxiSystem(unittest.TestCase):
                 Driver(driver["driver_id"], driver["name"]) for driver in drivers_data
             ]
 
+        with open("tests/addresses.json", "r", encoding="utf-8") as f:
+            self.addresses = {addr["id"]: addr for addr in json.load(f)}
+
         with open("tests/cars.json", "r", encoding="utf-8") as f:
             cars_data = json.load(f)
             self.cars = [
@@ -45,6 +48,10 @@ class TestTaxiSystem(unittest.TestCase):
             DriverInterface(self.taxi_park, driver.driver_id) for driver in self.drivers
         ]
         print("=== Тестовые данные готовы ===\n")
+
+    def get_address(self, address_id):
+        """Получение адреса по ID"""
+        return self.addresses.get(address_id)
 
     def test_order_creation_and_notification(self):
         print("\n--- Тест 1: Создание заказа и уведомление водителей ---")
