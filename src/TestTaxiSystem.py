@@ -1,4 +1,5 @@
 import unittest
+import json
 from TaxiSystem import (
     TaxiPark,
     Driver,
@@ -14,22 +15,35 @@ class TestTaxiSystem(unittest.TestCase):
         print("\n\n=== Тестовые данные ===")
         self.taxi_park = TaxiPark()
         self.owner = OwnerInterface(self.taxi_park)
-        self.driver1 = Driver(1, "Антон Сафонов")
-        self.driver2 = Driver(2, "Влад Круглышев")
-        self.car1 = Car(1, "Toyota Supra", "A123BC")
-        self.car2 = Car(2, "Traktor Belarus", "B456DE")
+
+        with open("tests/drivers.json", "r", encoding="utf-8") as f:
+            drivers_data = json.load(f)
+            self.drivers = [
+                Driver(driver["driver_id"], driver["name"]) for driver in drivers_data
+            ]
+
+        with open("tests/cars.json", "r", encoding="utf-8") as f:
+            cars_data = json.load(f)
+            self.cars = [
+                Car(car["car_id"], car["model"], car["license_plate"])
+                for car in cars_data
+            ]
 
         print("Добавляем водителей и автомобили:")
-        self.owner.add_driver(self.driver1)
-        self.owner.add_driver(self.driver2)
-        self.owner.add_car(self.car1)
-        self.owner.add_car(self.car2)
-        print(f"Добавлены водители: {self.driver1.name}, {self.driver2.name}")
-        print(f"Добавлены автомобили: {self.car1.model}, {self.car2.model}")
+        for driver in self.drivers:
+            self.owner.add_driver(driver)
+        for car in self.cars:
+            self.owner.add_car(car)
+
+        driver_names = ", ".join([driver.name for driver in self.drivers])
+        car_models = ", ".join([car.model for car in self.cars])
+        print(f"Добавлены водители: {driver_names}")
+        print(f"Добавлены автомобили: {car_models}")
 
         self.client = ClientInterface(self.taxi_park)
-        self.driver_interface1 = DriverInterface(self.taxi_park, 1)
-        self.driver_interface2 = DriverInterface(self.taxi_park, 2)
+        self.driver_interfaces = [
+            DriverInterface(self.taxi_park, driver.driver_id) for driver in self.drivers
+        ]
         print("=== Тестовые данные готовы ===\n")
 
     def test_order_creation_and_notification(self):
