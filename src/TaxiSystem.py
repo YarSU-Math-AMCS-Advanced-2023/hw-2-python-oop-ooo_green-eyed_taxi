@@ -4,31 +4,37 @@ import datetime
 
 class DriverAssignmentStrategy:
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(DriverAssignmentStrategy, cls).__new__(cls)
         return cls._instance
-    
+
     def is_peak_hour(self) -> bool:
         current_time = datetime.datetime.now().time()
         morning_peak = datetime.time(7, 0) <= current_time <= datetime.time(10, 0)
         evening_peak = datetime.time(17, 0) <= current_time <= datetime.time(20, 0)
         return morning_peak or evening_peak
-    
-    def select_driver(self, drivers: List["Driver"], order: "Order") -> Optional["Driver"]:
+
+    def select_driver(
+        self, drivers: List["Driver"], order: "Order"
+    ) -> Optional["Driver"]:
         if not drivers:
             return None
-            
+
         if self.is_peak_hour():
-            return min(drivers, key=lambda d: self.calculate_distance(d.x, d.y, order.x, order.y))
+            return min(
+                drivers,
+                key=lambda d: self.calculate_distance(d.x, d.y, order.x, order.y),
+            )
         else:
             return min(drivers, key=lambda d: abs(d.rating - order.client_rating))
-    
-    @staticmethod
-    def calculate_distance(driver_x: float, driver_y: float, order_x: float, order_y: float) -> float:
-        return abs(driver_x - order_x) + abs(driver_y - order_y)
 
+    @staticmethod
+    def calculate_distance(
+        driver_x: float, driver_y: float, order_x: float, order_y: float
+    ) -> float:
+        return abs(driver_x - order_x) + abs(driver_y - order_y)
 
 
 class OrderSubject:
@@ -42,14 +48,30 @@ class OrderSubject:
     def detach(self, observer: "Driver"):
         self._observers.remove(observer)
 
-    def notify(self, order: "Order"):
+    def notify(self, order: "Order", selected_driver_id: int):
         for observer in self._observers:
-            if observer.is_available:
+            if observer.is_available and observer.driver_id == selected_driver_id:
                 observer.update(order)
 
 
+class MapPoint:
+    def __init__(self, id: int, name: str, x: float, y: float):
+        self.id = id
+        self.x = x
+        self.y = y
+        self.name = name
+
+
 class Driver:
-    def __init__(self, driver_id: int, name: str, current_location: str = "default", x: float = 0, y: float = 0, rating: float = 5.0):
+    def __init__(
+        self,
+        driver_id: int,
+        name: str,
+        current_location: str = "default",
+        x: float = 0,
+        y: float = 0,
+        rating: float = 5.0,
+    ):
         self.driver_id = driver_id
         self.name = name
         self.is_available = True
@@ -67,6 +89,7 @@ class Driver:
         self.x = x
         self.y = y
 
+
 class Car:
     def __init__(self, car_id: int, model: str, license_plate: str):
         self.car_id = car_id
@@ -75,7 +98,14 @@ class Car:
 
 
 class Order:
-    def __init__(self, order_id: int, client_id: int, pickup: str, destination: str, x_start: float = 0, y_start: float = 0, x_end: float = 0, y_end: float = 0, client_rating: float = 5.0):
+    def __init__(
+        self,
+        order_id: int,
+        client_id: int,
+        pickup: MapPoint,
+        destination: MapPoint,
+        client_rating: float = 5.0,
+    ):
         self.order_id = order_id
         self.client_id = client_id
         self.pickup = pickup
@@ -83,24 +113,7 @@ class Order:
         self.status = "pending"  # pending, in_progress, completed
         self.driver: Optional[Driver] = None
         self.price: float = 0.0
-        self.x_start = x_start
-        self.y_start = y_start
-        self.x_end = x_end
-        self.y_end = y_end
         self.client_rating = client_rating
-
-
-class ClientInterface:
-    def __init__(self, taxi_park: "TaxiPark"):
-        self.taxi_park = taxi_park
-
-    def request_ride(self, client_id: int, pickup: str, destination: str) -> Order:
-        order = self.taxi_park.create_order(client_id, pickup, destination)
-        self.taxi_park.notify_drivers(order)
-        return order
-
-    def get_order_status(self, order_id: int) -> str:
-        return self.taxi_park.get_order_status(order_id)
 
 
 class OwnerInterface:
@@ -140,14 +153,16 @@ class TaxiPark(OrderSubject):
         self.orders: Dict[int, Order] = {}
         self.order_counter = 1
 
-    def create_order(self, client_id: int, pickup: str, destination: str) -> Order:
+    def create_order(
+        self, client_id: int, pickup: MapPoint, destination: MapPoint
+    ) -> Order:
         order = Order(self.order_counter, client_id, pickup, destination)
         self.orders[order.order_id] = order
         self.order_counter += 1
         return order
 
-    def notify_drivers(self, order: Order):
-        self.notify(order)
+    def notify_drivers(self, order: Order, selected_driver_id: int):
+        self.notify(order, selected_driver_id)
 
     def get_available_drivers(self) -> List[Driver]:
         return [driver for driver in self.drivers if driver.is_available]
@@ -159,7 +174,7 @@ class TaxiPark(OrderSubject):
     def add_car(self, car: Car):
         self.cars.append(car)
 
-    def assign_driver_to_order(self, order_id: int) -> bool:
+    def assign_driver_to_order(self, order_id: int) -> int:
         order = self.orders.get(order_id)
         if not order or order.status != "pending":
             return -1
@@ -170,10 +185,11 @@ class TaxiPark(OrderSubject):
 
         strategy = DriverAssignmentStrategy()
         selected_driver = strategy.select_driver(available_drivers, order)
-        
+
         if not selected_driver:
             return -1
 
+        self.notify_drivers(order, selected_driver.driver_id)
         order.status = "in_progress"
         order.driver = selected_driver
         selected_driver.current_order = order
@@ -181,7 +197,6 @@ class TaxiPark(OrderSubject):
         order.price = 10.0
 
         return selected_driver.driver_id
-
 
     def complete_order(self, order_id: int):
         order = self.orders.get(order_id)
@@ -203,3 +218,20 @@ class TaxiPark(OrderSubject):
         return sum(
             order.price for order in self.orders.values() if order.status == "completed"
         )
+
+
+class ClientInterface:
+    def __init__(self, taxi_park: "TaxiPark"):
+        self.taxi_park = taxi_park
+
+    def request_ride(
+        self, client_id: int, pickup: MapPoint, destination: MapPoint
+    ) -> Order:
+        order = self.taxi_park.create_order(client_id, pickup, destination)
+        driver_id = -1
+        while driver_id == -1:
+            driver_id = self.taxi_park.assign_driver_to_order(order.order_id)
+        return order
+
+    def get_order_status(self, order_id: int) -> str:
+        return self.taxi_park.get_order_status(order_id)
