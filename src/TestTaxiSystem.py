@@ -76,6 +76,73 @@ class TestTaxiSystem(unittest.TestCase):
         print(f"Проверка статуса через клиента: {status}")
         self.assertEqual(status, "in_progress")
         print("✅ Клиентская часть верно отображает статус заказа")
+    def test_the_end_of_order(self):
+        print("\n--- Тест 2: Окончание поездки ---")
+        start = self.get_address(2)
+        end = self.get_address(4)
+        print(f"Клиент создает заказ из {start.name} в {end.name}")
+        order = self.client.request_ride(101, start, end)
+        status = self.client.get_order_status(order.order_id)
+        print(f"Проверка статуса через клиента: {status}")
+        self.assertEqual(status, "in_progress")
+        print("✅ Клиентская часть верно отображает статус заказа")
+        self.driver_interfaces[order.driver.driver_id].complete_order(order.order_id)
+        self.assertEqual(order.status, "completed")
+        print("✅ Статус заказа корректно установлен как 'completed'")
+    def test_two_clients_the_same_time(self):
+        print("\n--- Тест 3: одновременный жизненный цикл двойного заказа ---")
+        start1 = self.get_address(2)
+        end1 = self.get_address(4)
+
+        start2 = self.get_address(4)
+        end2 = self.get_address(2)
+
+        print(f"Клиент создает заказ из {start1.name} в {end1.name}")
+        order1 = self.client.request_ride(101, start1, end1)
+
+        print(f"Клиент создает заказ из {start2.name} в {end2.name}")
+        order2 = self.client.request_ride(111, start2, end2)
+
+        status1 = self.client.get_order_status(order1.order_id)
+        status2 = self.client.get_order_status(order2.order_id)
+
+        print(f"Проверка статуса через клиента: {status1}")
+        self.assertEqual(status1, "in_progress")
+        print(f"Проверка статуса через клиента: {status2}")
+        self.assertEqual(status2, "in_progress")
+        print("✅ Клиентская часть верно отображает статус заказа")
+
+        self.driver_interfaces[order1.driver.driver_id].complete_order(order1.order_id)
+        self.assertEqual(order1.status, "completed")
+        print("✅ Статус 1-го заказа корректно установлен как 'completed'")
+
+        self.driver_interfaces[order2.driver.driver_id].complete_order(order2.order_id)
+        self.assertEqual(order2.status, "completed")
+        print("✅ Статус 2-го заказа корректно установлен как 'completed'")
+
+    def test_dearth_drivers(self):
+        print("\n--- Тест 4: Нехватка водителей ---")
+        start1 = self.get_address(2)
+        end1 = self.get_address(4)
+
+        start2 = self.get_address(4)
+        end2 = self.get_address(2)
+
+        start3 = self.get_address(1)
+        end3 = self.get_address(5)
+
+        print(f"Клиент создает заказ из {start1.name} в {end1.name}")
+        order1 = self.client.request_ride(101, start1, end1)
+
+        print(f"Клиент создает заказ из {start2.name} в {end2.name}")
+        order2 = self.client.request_ride(111, start2, end2)
+
+        print(f"Клиент создает заказ из {start3.name} в {end3.name}")
+        order2 = self.client.request_ride(121, start3, end3)
+
+        
+
+
 
     # def test_order_creation_and_notification(self):
     #     print("\n--- Тест 1: Создание заказа и уведомление водителей ---")

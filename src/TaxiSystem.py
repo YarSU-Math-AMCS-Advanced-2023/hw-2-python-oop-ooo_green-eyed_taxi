@@ -88,7 +88,8 @@ class Driver:
     def set_location(self, x: float = 0, y: float = 0):
         self.x = x
         self.y = y
-
+    def end_order(self):
+        pass
 
 class Car:
     def __init__(self, car_id: int, model: str, license_plate: str):
@@ -204,7 +205,8 @@ class TaxiPark(OrderSubject):
             order.status = "completed"
             order.driver.is_available = True
             order.driver.current_order = None
-            order.driver.set_location(order.x_end, order.y_end)
+            order.driver.set_location(order.destination.x, order.destination.y)
+
 
     def get_order_status(self, order_id: int) -> str:
         return self.orders.get(order_id, Order(0, 0, "", "")).status
