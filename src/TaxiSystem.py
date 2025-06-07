@@ -31,7 +31,13 @@ class DriverAssignmentStrategy:
                 ),
             )
         else:
-            return min(drivers, key=lambda d: abs(d.rating - order.client_rating))
+            return min(
+                drivers,
+                key=lambda d: self.calculate_distance(
+                    d.x, d.y, order.pickup.x, order.pickup.y
+                )
+                * abs(d.rating - order.client_rating),
+            )
 
     @staticmethod
     def calculate_distance(
@@ -231,6 +237,21 @@ class TaxiPark(OrderSubject):
     def add_driver(self, driver: Driver):
         self.drivers.append(driver)
         self.attach(driver)
+
+    def get_rating(self, driver_id: int):
+        if self.drivers[driver_id]:
+            return self.drivers[driver_id].rating
+
+    def change_driver_rating(self, driver_id: int, newRating: int):
+        if self.drivers[driver_id]:
+            self.drivers[driver_id].rating = max(
+                min(
+                    self.drivers[driver_id].rating
+                    + (newRating - self.drivers[driver_id].rating) * 0.1,
+                    5,
+                ),
+                0,
+            )
 
     def add_car(self, car: Car):
         self.cars.append(car)
