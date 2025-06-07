@@ -21,14 +21,13 @@ class DriverAssignmentStrategy:
             return None
             
         if self.is_peak_hour():
-            return min(drivers, key=lambda d: self.calculate_distance(d.current_location, order.pickup))
+            return min(drivers, key=lambda d: self.calculate_distance(d.x, d.y, order.x, order.y))
         else:
             return min(drivers, key=lambda d: abs(d.rating - order.client_rating))
     
     @staticmethod
-    def calculate_distance(location1: str, location2: str) -> float:
-        # Заглушка для реальной логики расчета расстояния
-        return hash(location1 + location2) % 100  # Примерное "расстояние"
+    def calculate_distance(driver_x: float, driver_y: float, order_x: float, order_y: float) -> float:
+        return abs(driver_x - order_x) + abs(driver_y - order_y)
 
 
 
@@ -50,31 +49,33 @@ class OrderSubject:
 
 
 class Driver:
-    def __init__(self, driver_id: int, name: str, current_location: str = "default", rating: float = 5.0): #x: float, y: float, rating: float = 5.0):
+    def __init__(self, driver_id: int, name: str, current_location: str = "default", x: float = 0, y: float = 0, rating: float = 5.0):
         self.driver_id = driver_id
         self.name = name
         self.is_available = True
         self.current_order: Optional["Order"] = None
         self.current_location = current_location
-        # self.x = x
-        # self.y = y
+        self.x = x
+        self.y = y
         self.rating = rating
 
     def update(self, order: "Order"):
         if self.is_available:
             print(f"Водитель {self.name} получил уведомление о заказе {order.order_id}")
 
+    def set_location(self, x: float = 0, y: float = 0):
+        self.x = x
+        self.y = y
 
 class Car:
     def __init__(self, car_id: int, model: str, license_plate: str):
         self.car_id = car_id
         self.model = model
         self.license_plate = license_plate
-        self.is_available = True
 
 
 class Order:
-    def __init__(self, order_id: int, client_id: int, pickup: str, destination: str, client_rating: float = 5.0):
+    def __init__(self, order_id: int, client_id: int, pickup: str, destination: str, x_start: float = 0, y_start: float = 0, x_end: float = 0, y_end: float = 0, client_rating: float = 5.0):
         self.order_id = order_id
         self.client_id = client_id
         self.pickup = pickup
@@ -82,6 +83,10 @@ class Order:
         self.status = "pending"  # pending, in_progress, completed
         self.driver: Optional[Driver] = None
         self.price: float = 0.0
+        self.x_start = x_start
+        self.y_start = y_start
+        self.x_end = x_end
+        self.y_end = y_end
         self.client_rating = client_rating
 
 
@@ -184,6 +189,7 @@ class TaxiPark(OrderSubject):
             order.status = "completed"
             order.driver.is_available = True
             order.driver.current_order = None
+            order.driver.set_location(order.x_end, order.y_end)
 
     def get_order_status(self, order_id: int) -> str:
         return self.orders.get(order_id, Order(0, 0, "", "")).status
