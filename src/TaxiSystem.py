@@ -26,7 +26,9 @@ class DriverAssignmentStrategy:
         if self.is_peak_hour():
             return min(
                 drivers,
-                key=lambda d: self.calculate_distance(d.x, d.y, order.x, order.y),
+                key=lambda d: self.calculate_distance(
+                    d.x, d.y, order.pickup.x, order.pickup.y
+                ),
             )
         else:
             return min(drivers, key=lambda d: abs(d.rating - order.client_rating))
@@ -155,16 +157,70 @@ class TaxiPark(OrderSubject):
         self.drivers: List[Driver] = []
         self.cars: List[Car] = []
         self.orders: Dict[int, Order] = {}
+        self.pending_orders: List[Order] = []  # Очередь ожидающих заказов
         self.order_counter = 1
 
     def create_order(
         self, client_id: int, pickup: MapPoint, destination: MapPoint
     ) -> Order:
-
         order = Order(self.order_counter, client_id, pickup, destination)
         self.orders[order.order_id] = order
         self.order_counter += 1
+        self.process_order(order)  # Пытаемся обработать заказ сразу
         return order
+
+    def process_order(self, order: Order):
+        available_drivers = self.get_available_drivers()
+        if not available_drivers:
+            self.pending_orders.append(order)  # Добавляем в очередь, если нет водителей
+            return
+
+        strategy = DriverAssignmentStrategy()
+        selected_driver = strategy.select_driver(available_drivers, order)
+
+        if selected_driver:
+            self.assign_driver(order, selected_driver)
+        else:
+            self.pending_orders.append(order)
+
+    def assign_driver(self, order: Order, driver: Driver):
+        self.notify_drivers(order, driver.driver_id)
+        order.status = "in_progress"
+        order.driver = driver
+        driver.current_order = order
+        driver.is_available = False
+        order.price = math.ceil(
+            (
+                (order.destination.x - order.pickup.x) ** 2
+                + (order.destination.y - order.pickup.y) ** 2
+            )
+            ** 0.5
+            * 0.5
+        )
+
+    def complete_order(self, order_id: int):
+        order = self.orders.get(order_id)
+        if order and order.status == "in_progress" and order.driver:
+            order.status = "completed"
+            driver = order.driver
+            driver.is_available = True
+            driver.current_order = None
+            driver.set_location(order.destination.x, order.destination.y)
+
+            # При освобождении водителя проверяем очередь заказов
+            self.check_pending_orders()
+
+    def check_pending_orders(self):
+        if not self.pending_orders:
+            return
+
+        # Создаем копию, чтобы избежать проблем при изменении списка
+        pending_copy = self.pending_orders.copy()
+        self.pending_orders = []
+
+        for order in pending_copy:
+            if order.status == "pending":  # Проверяем, не был ли уже обработан
+                self.process_order(order)
 
     def notify_drivers(self, order: Order, selected_driver_id: int):
         self.notify(order, selected_driver_id)
@@ -210,14 +266,6 @@ class TaxiPark(OrderSubject):
 
         return selected_driver.driver_id
 
-    def complete_order(self, order_id: int):
-        order = self.orders.get(order_id)
-        if order and order.status == "in_progress" and order.driver:
-            order.status = "completed"
-            order.driver.is_available = True
-            order.driver.current_order = None
-            order.driver.set_location(order.destination.x, order.destination.y)
-
     def get_order_status(self, order_id: int) -> str:
         return self.orders.get(order_id, Order(0, 0, "", "")).status
 
@@ -241,7 +289,7 @@ class ClientInterface:
     ) -> Order:
         order = self.taxi_park.create_order(client_id, pickup, destination)
         driver_id = self.taxi_park.assign_driver_to_order(order.order_id)
-        return None if driver_id == -1 else order
+        return order, driver_id
 
     def get_order_status(self, order_id: int) -> str:
         return self.taxi_park.get_order_status(order_id)

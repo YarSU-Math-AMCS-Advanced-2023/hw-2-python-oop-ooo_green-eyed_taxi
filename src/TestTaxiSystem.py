@@ -65,7 +65,7 @@ class TestTaxiSystem(unittest.TestCase):
         start = self.get_address(1)
         end = self.get_address(3)
         print(f"Клиент создает заказ из {start.name} в {end.name}")
-        order = self.client.request_ride(101, start, end)
+        order, driver_id = self.client.request_ride(101, start, end)
         print(f"Создан заказ #{order.order_id}:")
         print(f"  Откуда: {order.pickup.name}")
         print(f"  Куда: {order.destination.name}")
@@ -82,7 +82,7 @@ class TestTaxiSystem(unittest.TestCase):
         start = self.get_address(2)
         end = self.get_address(4)
         print(f"Клиент создает заказ из {start.name} в {end.name}")
-        order = self.client.request_ride(101, start, end)
+        order, driver_id = self.client.request_ride(101, start, end)
         status = self.client.get_order_status(order.order_id)
         print(f"Проверка статуса через клиента: {status}")
         self.assertEqual(status, "in_progress")
@@ -100,10 +100,10 @@ class TestTaxiSystem(unittest.TestCase):
         end2 = self.get_address(2)
 
         print(f"Клиент создает заказ из {start1.name} в {end1.name}")
-        order1 = self.client.request_ride(101, start1, end1)
+        order1, driver_id = self.client.request_ride(101, start1, end1)
 
         print(f"Клиент создает заказ из {start2.name} в {end2.name}")
-        order2 = self.client.request_ride(111, start2, end2)
+        order2, driver_id = self.client.request_ride(111, start2, end2)
 
         status1 = self.client.get_order_status(order1.order_id)
         status2 = self.client.get_order_status(order2.order_id)
@@ -134,15 +134,18 @@ class TestTaxiSystem(unittest.TestCase):
         end3 = self.get_address(5)
 
         print(f"Клиент создает заказ из {start1.name} в {end1.name}")
-        order1 = self.client.request_ride(101, start1, end1)
+        order1, driver_id = self.client.request_ride(101, start1, end1)
 
         print(f"Клиент создает заказ из {start2.name} в {end2.name}")
-        order2 = self.client.request_ride(111, start2, end2)
+        order2, driver_id = self.client.request_ride(111, start2, end2)
 
         print(f"Клиент создает заказ из {start3.name} в {end3.name}")
-        order3 = self.client.request_ride(121, start3, end3)
-        if order3 is None:
+        order3, driver_id = self.client.request_ride(121, start3, end3)
+        if driver_id == -1:
             print("Свободных водителей пока нет. Ожидайте...")
+
+        self.driver_interfaces[order1.driver.driver_id].complete_order(order1.order_id)
+        print(self.client.get_order_status(order3.order_id))
 
     def test_financial_reporting(self):
         print("\n--- Тест 5: Финансовая отчетность ---")
@@ -155,11 +158,11 @@ class TestTaxiSystem(unittest.TestCase):
         end2 = self.get_address(2)
 
         print(f"Клиент создает заказ из {start1.name} в {end1.name}")
-        order1 = self.client.request_ride(101, start1, end1)
+        order1, driver_id = self.client.request_ride(101, start1, end1)
         print(f"Стоимость заказа: {order1.price} руб.")
 
         print(f"Клиент создает заказ из {start2.name} в {end2.name}")
-        order2 = self.client.request_ride(111, start2, end2)
+        order2, driver_id = self.client.request_ride(111, start2, end2)
         print(f"Стоимость заказа: {order2.price} руб.")
 
         self.driver_interfaces[order1.driver.driver_id].complete_order(order1.order_id)
