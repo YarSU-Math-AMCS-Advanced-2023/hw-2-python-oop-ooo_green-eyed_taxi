@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict
 import datetime
+import math
 
 
 class DriverAssignmentStrategy:
@@ -88,8 +89,10 @@ class Driver:
     def set_location(self, x: float = 0, y: float = 0):
         self.x = x
         self.y = y
+
     def end_order(self):
         pass
+
 
 class Car:
     def __init__(self, car_id: int, model: str, license_plate: str):
@@ -157,6 +160,7 @@ class TaxiPark(OrderSubject):
     def create_order(
         self, client_id: int, pickup: MapPoint, destination: MapPoint
     ) -> Order:
+
         order = Order(self.order_counter, client_id, pickup, destination)
         self.orders[order.order_id] = order
         self.order_counter += 1
@@ -195,7 +199,14 @@ class TaxiPark(OrderSubject):
         order.driver = selected_driver
         selected_driver.current_order = order
         selected_driver.is_available = False
-        order.price = 10.0
+        order.price = math.ceil(
+            (
+                (order.destination.x - order.pickup.x) ** 2
+                + (order.destination.y - order.pickup.y) ** 2
+            )
+            ** 0.5
+            * 0.5
+        )
 
         return selected_driver.driver_id
 
@@ -206,7 +217,6 @@ class TaxiPark(OrderSubject):
             order.driver.is_available = True
             order.driver.current_order = None
             order.driver.set_location(order.destination.x, order.destination.y)
-
 
     def get_order_status(self, order_id: int) -> str:
         return self.orders.get(order_id, Order(0, 0, "", "")).status
@@ -230,10 +240,8 @@ class ClientInterface:
         self, client_id: int, pickup: MapPoint, destination: MapPoint
     ) -> Order:
         order = self.taxi_park.create_order(client_id, pickup, destination)
-        driver_id = -1
-        while driver_id == -1:
-            driver_id = self.taxi_park.assign_driver_to_order(order.order_id)
-        return order
+        driver_id = self.taxi_park.assign_driver_to_order(order.order_id)
+        return None if driver_id == -1 else order
 
     def get_order_status(self, order_id: int) -> str:
         return self.taxi_park.get_order_status(order_id)
