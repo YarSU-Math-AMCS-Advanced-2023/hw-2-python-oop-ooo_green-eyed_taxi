@@ -1,0 +1,12 @@
+[
+    {
+        "car_id": 1,
+        "model": "Toyota Supra",
+        "license_plate": "A123BC"
+    },
+    {
+        "car_id": 2,
+        "model": "Traktor Belarus",
+        "license_plate": "B456DE"
+    }
+]
